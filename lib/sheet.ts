@@ -1,5 +1,8 @@
+import { log } from "@/lib/log";
+
 const CACHE_TTL_MS = 60_000;
 const FAQ_MAX_CHARS = 6000;
+const SHEET_FETCH_TIMEOUT_MS = 5_000;
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -87,7 +90,7 @@ function truncateFaqText(text: string): string {
   if (text.length <= FAQ_MAX_CHARS) {
     return text;
   }
-  console.warn("FAQ text truncated to fit prompt size limit", {
+  log.warn("sheet.faq_truncated", {
     originalLength: text.length,
     maxLength: FAQ_MAX_CHARS,
   });
@@ -96,7 +99,10 @@ function truncateFaqText(text: string): string {
 
 async function fetchAndBuildFaqText(): Promise<string> {
   const sheetCsvUrl = requiredEnv("SHEET_CSV_URL");
-  const res = await fetch(sheetCsvUrl, { cache: "no-store" });
+  const res = await fetch(sheetCsvUrl, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(SHEET_FETCH_TIMEOUT_MS),
+  });
   if (!res.ok) {
     throw new Error(`Sheet fetch failed with status ${res.status}`);
   }
@@ -172,7 +178,7 @@ export async function getFaqText(): Promise<string> {
       return text;
     })
     .catch((error: unknown) => {
-      console.error("Failed to load FAQ sheet", {
+      log.error("sheet.fetch_failed", {
         message: error instanceof Error ? error.message : "Unknown error",
       });
       if (cache) {
