@@ -9,6 +9,7 @@ import { getFaqText } from "@/lib/sheet";
 import { generateReply, DEFAULT_REPLY } from "@/lib/gemini";
 
 export const runtime = "nodejs";
+export const maxDuration = 30;
 
 function requiredEnv(name: string): string {
   const value = process.env[name];

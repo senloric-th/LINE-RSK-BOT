@@ -1,7 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
 
 const MODEL_NAME = "gemini-3.5-flash";
-const GEMINI_TIMEOUT_MS = 7_000;
+// Gemini rejects an explicit deadline under 10s (INVALID_ARGUMENT), and
+// real calls routinely take close to that floor, so the client-side abort
+// budget must sit comfortably above it.
+const GEMINI_TIMEOUT_MS = 20_000;
 const MAX_QUESTION_CHARS = 2000;
 
 export const DEFAULT_REPLY = "ทางร้านยังไม่มีข้อมูลส่วนนี้ค่ะ ขออภัยด้วยค่ะ";
