@@ -90,7 +90,6 @@ export async function generateReply(
         ...generationConfig,
         systemInstruction: SYSTEM_INSTRUCTION,
         abortSignal: controller.signal,
-        httpOptions: { timeout: GEMINI_TIMEOUT_MS },
       },
     });
 
