@@ -107,10 +107,20 @@ async function fetchAndBuildFaqText(): Promise<string> {
   }
 
   const header = table[0].map((h) => h.trim().toLowerCase());
-  const categoryIdx = header.indexOf("category");
-  const questionIdx = header.indexOf("question");
-  const answerIdx = header.indexOf("answer");
-  const enabledIdx = header.indexOf("enabled");
+  const findColumn = (aliases: string[]): number => {
+    for (const alias of aliases) {
+      const idx = header.indexOf(alias);
+      if (idx !== -1) {
+        return idx;
+      }
+    }
+    return -1;
+  };
+
+  const categoryIdx = findColumn(["category", "หมวด", "หมวดหมู่"]);
+  const questionIdx = findColumn(["question", "คำถาม"]);
+  const answerIdx = findColumn(["answer", "คำตอบ"]);
+  const enabledIdx = findColumn(["enabled", "เปิดใช้งาน"]);
 
   if (questionIdx === -1 || answerIdx === -1) {
     throw new Error("Sheet CSV is missing required columns (question/answer)");
