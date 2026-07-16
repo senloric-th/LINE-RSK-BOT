@@ -1,7 +1,10 @@
 import { log } from "@/lib/log";
 
 const CACHE_TTL_MS = 60_000;
-const FAQ_MAX_CHARS = 6000;
+// Not a Gemini limit — a self-imposed safety cap. Raised from the original
+// 6,000 so a handful of full product spec sheets can fit without silent
+// truncation; revisit with a relevance-filtering pass if this stops being enough.
+const FAQ_MAX_CHARS = 20_000;
 const SHEET_FETCH_TIMEOUT_MS = 5_000;
 
 function requiredEnv(name: string): string {
