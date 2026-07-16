@@ -86,6 +86,16 @@ async function notifyAdmin(
 }
 
 async function handleEvent(event: WebhookEvent, client: Client): Promise<void> {
+  if (event.type === "join") {
+    const source = event.source;
+    log.info("webhook.bot_joined", {
+      sourceType: source.type,
+      groupId: source.type === "group" ? source.groupId : undefined,
+      roomId: source.type === "room" ? source.roomId : undefined,
+    });
+    return;
+  }
+
   if (!isTextMessageEvent(event)) {
     return;
   }
