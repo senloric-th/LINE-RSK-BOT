@@ -9,7 +9,8 @@ const MODEL_NAME = "gemini-3.5-flash";
 const GEMINI_TIMEOUT_MS = 20_000;
 const MAX_QUESTION_CHARS = 2000;
 
-export const DEFAULT_REPLY = "ทางร้านยังไม่มีข้อมูลส่วนนี้ค่ะ ขออภัยด้วยค่ะ";
+export const DEFAULT_REPLY =
+  "ขออภัยค่ะ ตอนนี้น้องรักสุขภาพแชตบอตยังไม่มีข้อมูลเพียงพอสำหรับคำถามนี้ ทางแอดมินจะเข้ามาตรวจสอบและตอบกลับให้โดยเร็วที่สุดนะคะ";
 
 const generationConfig = {
   temperature: 1.0,
