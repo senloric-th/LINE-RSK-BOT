@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  Client,
-  validateSignature,
-  type WebhookEvent,
-  type TextEventMessage,
-} from "@line/bot-sdk";
+import { Client, validateSignature, type WebhookEvent } from "@line/bot-sdk";
 import { getFaqText } from "@/lib/sheet";
 import { generateReply, DEFAULT_REPLY } from "@/lib/gemini";
 import { shouldHandoff, HANDOFF_REPLY } from "@/lib/handoff";
@@ -14,6 +9,9 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 const REPLY_RETRY_ATTEMPTS = 3;
+
+const NON_TEXT_MESSAGE_REPLY =
+  "ขออภัยค่ะ ตอนนี้รักสุขภาพบอทยังไม่สามารถอ่านรูปภาพหรือไฟล์ประเภทนี้ได้ รบกวนลูกค้าพิมพ์ข้อความบอกชื่อสินค้าหรือคำถามที่ต้องการสอบถามแทนนะคะ";
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -36,12 +34,6 @@ function getLineClient(): { client: Client; channelSecret: string } {
     });
   }
   return { client: lineClient, channelSecret: lineChannelSecret };
-}
-
-function isTextMessageEvent(
-  event: WebhookEvent
-): event is WebhookEvent & { type: "message"; message: TextEventMessage } {
-  return event.type === "message" && event.message.type === "text";
 }
 
 async function replyWithRetry(
@@ -96,7 +88,24 @@ async function handleEvent(event: WebhookEvent, client: Client): Promise<void> {
     return;
   }
 
-  if (!isTextMessageEvent(event)) {
+  if (event.type !== "message") {
+    return;
+  }
+
+  if (event.message.type !== "text") {
+    try {
+      await replyWithRetry(
+        client,
+        event.replyToken,
+        NON_TEXT_MESSAGE_REPLY,
+        REPLY_RETRY_ATTEMPTS
+      );
+    } catch (error: unknown) {
+      log.error("webhook.line_reply_failed", {
+        eventType: event.type,
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
     return;
   }
 
