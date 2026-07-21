@@ -3,7 +3,15 @@ import { Client, validateSignature, type WebhookEvent } from "@line/bot-sdk";
 import { getRelevantFaqText } from "@/lib/retrieval";
 import { generateReply, DEFAULT_REPLY } from "@/lib/gemini";
 import { shouldHandoff, HANDOFF_REPLY } from "@/lib/handoff";
+import { getRecentTurns, appendTurn } from "@/lib/conversation";
 import { log } from "@/lib/log";
+
+// How many of the customer's own recent questions (plus the current one)
+// feed the FAQ search step — separate from how much history Gemini sees
+// (lib/conversation.ts's MAX_TURNS). A vague follow-up like "อันละเท่าไหร่คะ"
+// carries no product name on its own, so retrieval needs this context too,
+// not just the generation step.
+const RETRIEVAL_CONTEXT_QUESTIONS = 3;
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -114,13 +122,18 @@ async function handleEvent(event: WebhookEvent, client: Client): Promise<void> {
   const userId = event.source.userId;
   const startTime = Date.now();
 
+  const history = userId ? await getRecentTurns(userId) : [];
+
   let reply: string;
   if (shouldHandoff(question)) {
     reply = HANDOFF_REPLY;
   } else {
     try {
-      const faqText = await getRelevantFaqText(question);
-      reply = await generateReply({ question, faqText });
+      const retrievalQuery = [...history.map((t) => t.question), question]
+        .slice(-RETRIEVAL_CONTEXT_QUESTIONS)
+        .join("\n");
+      const faqText = await getRelevantFaqText(retrievalQuery);
+      reply = await generateReply({ question, faqText, history });
     } catch (error: unknown) {
       log.error("webhook.reply_build_failed", {
         message: error instanceof Error ? error.message : "Unknown error",
@@ -134,6 +147,10 @@ async function handleEvent(event: WebhookEvent, client: Client): Promise<void> {
   // on the final text rather than only on the pre-check branch above.
   if (reply === HANDOFF_REPLY) {
     await notifyAdmin(client, userId, question);
+  }
+
+  if (userId) {
+    await appendTurn(userId, question, reply);
   }
 
   try {

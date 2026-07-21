@@ -1,6 +1,7 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, type Content } from "@google/genai";
 import { HANDOFF_REPLY } from "@/lib/handoff";
 import { log } from "@/lib/log";
+import type { Turn } from "@/lib/conversation";
 
 const MODEL_NAME = "gemini-3.5-flash";
 // Gemini rejects an explicit deadline under 10s (INVALID_ARGUMENT), and
@@ -94,11 +95,30 @@ export function getClient(): GoogleGenAI {
 export type GenerateReplyInput = {
   question: string;
   faqText: string;
+  // Recent turns for this customer, oldest first — lets Gemini resolve
+  // follow-ups like "อันละเท่าไหร่คะ" that only make sense given what was
+  // just discussed. Historical turns carry the raw exchanged text only,
+  // not the <faq> context that grounded them — only the current turn's
+  // answer needs to be grounded in fresh, retrieved FAQ content.
+  history?: Turn[];
 };
 
 function buildUserContent(question: string, faqText: string): string {
   const trimmedQuestion = question.trim().slice(0, MAX_QUESTION_CHARS);
   return `<faq>\n${faqText}\n</faq>\n\n<question>\n${trimmedQuestion}\n</question>`;
+}
+
+function buildContents(input: GenerateReplyInput): Content[] {
+  const contents: Content[] = [];
+  for (const turn of input.history ?? []) {
+    contents.push({ role: "user", parts: [{ text: turn.question }] });
+    contents.push({ role: "model", parts: [{ text: turn.reply }] });
+  }
+  contents.push({
+    role: "user",
+    parts: [{ text: buildUserContent(input.question, input.faqText) }],
+  });
+  return contents;
 }
 
 export async function generateReply(
@@ -110,7 +130,7 @@ export async function generateReply(
   try {
     const response = await getClient().models.generateContent({
       model: MODEL_NAME,
-      contents: buildUserContent(input.question, input.faqText),
+      contents: buildContents(input),
       config: {
         ...generationConfig,
         systemInstruction: SYSTEM_INSTRUCTION,
