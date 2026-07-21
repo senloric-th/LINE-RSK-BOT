@@ -78,7 +78,7 @@ function requiredEnv(name: string): string {
 }
 
 let client: GoogleGenAI | null = null;
-function getClient(): GoogleGenAI {
+export function getClient(): GoogleGenAI {
   if (!client) {
     client = new GoogleGenAI({ apiKey: requiredEnv("GEMINI_API_KEY") });
   }

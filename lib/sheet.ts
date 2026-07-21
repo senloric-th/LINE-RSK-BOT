@@ -17,19 +17,23 @@ function requiredEnv(name: string): string {
   return value;
 }
 
-type FaqRow = {
+export type FaqRow = {
   category: string;
   question: string;
   answer: string;
 };
 
-type SheetCache = {
+type SheetData = {
+  rows: FaqRow[];
   text: string;
+};
+
+type SheetCache = SheetData & {
   fetchedAt: number;
 };
 
 let cache: SheetCache | null = null;
-let inflight: Promise<string> | null = null;
+let inflight: Promise<SheetData> | null = null;
 
 /**
  * Minimal RFC4180-style CSV parser: handles quoted fields containing
@@ -82,7 +86,7 @@ function parseCsv(input: string): string[][] {
   return rows.filter((r) => r.some((cell) => cell.trim().length > 0));
 }
 
-function buildFaqText(rows: FaqRow[]): string {
+export function buildFaqText(rows: FaqRow[]): string {
   return rows
     .map(
       (row) =>
@@ -91,7 +95,7 @@ function buildFaqText(rows: FaqRow[]): string {
     .join("\n\n");
 }
 
-function truncateFaqText(text: string): string {
+export function truncateFaqText(text: string): string {
   if (text.length <= FAQ_MAX_CHARS) {
     return text;
   }
@@ -102,7 +106,7 @@ function truncateFaqText(text: string): string {
   return text.slice(0, FAQ_MAX_CHARS);
 }
 
-async function fetchAndBuildFaqText(): Promise<string> {
+async function fetchAndBuildFaqData(): Promise<SheetData> {
   const sheetCsvUrl = requiredEnv("SHEET_CSV_URL");
   const res = await fetch(sheetCsvUrl, {
     cache: "no-store",
@@ -158,36 +162,36 @@ async function fetchAndBuildFaqText(): Promise<string> {
     throw new Error("Sheet CSV has no usable FAQ rows");
   }
 
-  return truncateFaqText(buildFaqText(rows));
+  return { rows, text: truncateFaqText(buildFaqText(rows)) };
 }
 
 /**
- * Returns FAQ text formatted for the Gemini prompt, using an in-memory
- * cache (60s TTL). On fetch failure, falls back to stale cache if any
- * exists; otherwise the error is thrown to the caller (webhook must
- * reply with DEFAULT_REPLY in that case).
+ * Returns FAQ rows + formatted text, using an in-memory cache (60s TTL).
+ * On fetch failure, falls back to stale cache if any exists; otherwise
+ * the error is thrown to the caller (webhook must reply with
+ * DEFAULT_REPLY in that case).
  */
-export async function getFaqText(): Promise<string> {
+async function getSheetData(): Promise<SheetData> {
   const now = Date.now();
   if (cache && now - cache.fetchedAt < CACHE_TTL_MS) {
-    return cache.text;
+    return cache;
   }
 
   if (inflight) {
     return inflight;
   }
 
-  inflight = fetchAndBuildFaqText()
-    .then((text) => {
-      cache = { text, fetchedAt: Date.now() };
-      return text;
+  inflight = fetchAndBuildFaqData()
+    .then((data) => {
+      cache = { ...data, fetchedAt: Date.now() };
+      return data;
     })
     .catch((error: unknown) => {
       log.error("sheet.fetch_failed", {
         message: error instanceof Error ? error.message : "Unknown error",
       });
       if (cache) {
-        return cache.text;
+        return { rows: cache.rows, text: cache.text };
       }
       throw error;
     })
@@ -196,4 +200,12 @@ export async function getFaqText(): Promise<string> {
     });
 
   return inflight;
+}
+
+export async function getFaqText(): Promise<string> {
+  return (await getSheetData()).text;
+}
+
+export async function getFaqRows(): Promise<FaqRow[]> {
+  return (await getSheetData()).rows;
 }

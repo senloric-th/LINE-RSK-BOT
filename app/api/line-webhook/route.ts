@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Client, validateSignature, type WebhookEvent } from "@line/bot-sdk";
-import { getFaqText } from "@/lib/sheet";
+import { getRelevantFaqText } from "@/lib/retrieval";
 import { generateReply, DEFAULT_REPLY } from "@/lib/gemini";
 import { shouldHandoff, HANDOFF_REPLY } from "@/lib/handoff";
 import { log } from "@/lib/log";
@@ -119,7 +119,7 @@ async function handleEvent(event: WebhookEvent, client: Client): Promise<void> {
     reply = HANDOFF_REPLY;
   } else {
     try {
-      const faqText = await getFaqText();
+      const faqText = await getRelevantFaqText(question);
       reply = await generateReply({ question, faqText });
     } catch (error: unknown) {
       log.error("webhook.reply_build_failed", {
