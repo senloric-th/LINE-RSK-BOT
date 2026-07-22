@@ -15,7 +15,7 @@ export type Turn = {
 };
 
 let client: Redis | null = null;
-function getClient(): Redis {
+export function getClient(): Redis {
   if (!client) {
     client = Redis.fromEnv();
   }

@@ -4,6 +4,7 @@ import { getRelevantFaqText } from "@/lib/retrieval";
 import { generateReply, DEFAULT_REPLY } from "@/lib/gemini";
 import { shouldHandoff, HANDOFF_REPLY } from "@/lib/handoff";
 import { getRecentTurns, appendTurn } from "@/lib/conversation";
+import { claimWebhookEvent } from "@/lib/webhook-dedup";
 import { log } from "@/lib/log";
 
 // How many of the customer's own recent questions (plus the current one)
@@ -86,6 +87,14 @@ async function notifyAdmin(
 }
 
 async function handleEvent(event: WebhookEvent, client: Client): Promise<void> {
+  const isNewEvent = await claimWebhookEvent(event.webhookEventId);
+  if (!isNewEvent) {
+    log.info("webhook.duplicate_event_skipped", {
+      eventType: event.type,
+    });
+    return;
+  }
+
   if (event.type === "join") {
     const source = event.source;
     log.info("webhook.bot_joined", {
